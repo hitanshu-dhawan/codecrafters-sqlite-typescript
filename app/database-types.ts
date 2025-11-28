@@ -1,3 +1,7 @@
+/**
+ * Enum representing the different types of values that can be stored in the database.
+ * These correspond to the serial types used in the SQLite file format.
+ */
 export enum ValueType {
     Null = 'null',
     Integer = 'integer',
@@ -7,11 +11,17 @@ export enum ValueType {
     Other = 'other',
 }
 
+/**
+ * Represents the type and size of a value stored in the database.
+ */
 export type DatabaseType = {
     valueType: ValueType;
     size: number;
 }
 
+/**
+ * Represents a value read from a record, including its type and size.
+ */
 export type RecordValue = {
     size: number;
 } & (
@@ -23,16 +33,44 @@ export type RecordValue = {
         | { valueType: ValueType.Other, value: null }
     )
 
+/**
+ * Definition of a column in a table schema.
+ */
 export type ColumnDefinition = {
     name: string;
     isPrimaryKey?: boolean;
 }
 
+/**
+ * Schema of a table, which is a list of column definitions.
+ */
 export type TableSchema = ColumnDefinition[];
 
+/**
+ * Type for the actual data values stored in a row.
+ */
 export type DataValueType = number | string | null;
+
+/**
+ * Represents a row in a table, mapping column names to values.
+ */
 export type Row = Record<string, DataValueType>;
 
+/**
+ * Converts a serial type code from the SQLite file format to a DatabaseType.
+ * 
+ * The serial type code determines the data type and size of the value.
+ * - 0: Null
+ * - 1-4: Integer (1 to 4 bytes)
+ * - 5: Integer (6 bytes)
+ * - 6: Integer (8 bytes)
+ * - 8: Integer 0
+ * - 9: Integer 1
+ * - >= 13 (odd): String (length = (code - 13) / 2)
+ * 
+ * @param code The serial type code.
+ * @returns The corresponding DatabaseType.
+ */
 export function serialCodeToDatabaseType(code: number): DatabaseType {
     if (code === 0) {
         return {

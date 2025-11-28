@@ -5,6 +5,9 @@ import { serialCodeToDatabaseType, ValueType, type DatabaseType, type DataValueT
 import { parseSql, type CreateTableNode } from './sql-parser';
 import { scanSql } from './sql-scanner';
 
+/**
+ * Represents the database connection and metadata.
+ */
 export interface Database {
     pageSize: number;
     tablesCount: number;
@@ -16,6 +19,12 @@ const PAGE_SIZE_OFFSET = 16;
 const PAGE_HEADER_SIZE = 8;
 const CELLS_COUNT_OFFSET = 3;
 
+/**
+ * Opens a database file and reads the header to initialize the Database object.
+ * 
+ * @param filePath The path to the database file.
+ * @returns A Promise that resolves to the Database object.
+ */
 export async function openDatabase(filePath: string): Promise<Database> {
     const fileHandle = await open(filePath, constants.O_RDONLY);
     const databaseHeader = new Uint8Array(DATABASE_HEADER_SIZE);
@@ -37,10 +46,18 @@ export async function openDatabase(filePath: string): Promise<Database> {
     };
 }
 
+/**
+ * Closes the database file handle.
+ * 
+ * @param database The Database object.
+ */
 export async function closeDatabase(database: Database): Promise<void> {
     await database.fileHandle.close();
 }
 
+/**
+ * Enum representing the type of a B-tree page.
+ */
 export enum PageType {
     InteriorIndex = 2,
     InteriorTable = 5,
@@ -59,6 +76,9 @@ function isInteriorPage(pageType: PageType) {
     return pageType === PageType.InteriorTable || pageType === PageType.InteriorIndex;
 }
 
+/**
+ * Represents a page in the database file.
+ */
 export interface DatabasePage {
     pageNumber: number;
     type: PageType;
@@ -71,6 +91,13 @@ export interface DatabasePage {
     cellPointerArrayView: DataView;
 }
 
+/**
+ * Reads a page from the database file.
+ * 
+ * @param database The Database object.
+ * @param pageNumber The page number (1-based).
+ * @returns A Promise that resolves to the DatabasePage object.
+ */
 export async function readPage(database: Database, pageNumber: number): Promise<DatabasePage> {
     const page = new Uint8Array(database.pageSize);
     const pageStart = (pageNumber - 1) * database.pageSize;
@@ -138,12 +165,18 @@ const sqliteSchemaTable: Table = {
     );`,
 }
 
+/**
+ * Represents a table in the database.
+ */
 export interface Table {
     name: string;
     rootPage: number;
     sql: string;
 }
 
+/**
+ * Represents an index in the database.
+ */
 export interface Index {
     tableName: string;
     rootPage: number;
@@ -155,6 +188,12 @@ interface TablesAndIndexes {
     indexes: Index[];
 }
 
+/**
+ * Retrieves all tables and indexes from the `sqlite_schema` table.
+ * 
+ * @param database The Database object.
+ * @returns An object containing arrays of tables and indexes.
+ */
 export async function getTablesAndIndexes(database: Database): Promise<TablesAndIndexes> {
     const columnsToRetrieve = new Set(sqliteSchemaTableSchema.map(column => column.name));
 
@@ -209,6 +248,14 @@ export async function getTablesAndIndexes(database: Database): Promise<TablesAnd
     return { tables, indexes };
 }
 
+/**
+ * Reads a record from a table leaf cell.
+ * 
+ * @param cell The table leaf cell containing the record.
+ * @param tableSchema The schema of the table.
+ * @param columnsToRetrieve The set of column names to retrieve.
+ * @returns A Row object containing the retrieved values.
+ */
 function readRecord(cell: TableLeafCell, tableSchema: TableSchema, columnsToRetrieve: Set<string>): Row {
     let currentRecordView = cell.recordBodyView;
     const row: Row = {};
@@ -239,6 +286,13 @@ interface TableLeafCell {
     recordBodyView: DataView;
 }
 
+/**
+ * Reads a single column value from a record.
+ * 
+ * @param databaseType The type and size of the value.
+ * @param currentRecordView The DataView pointing to the value.
+ * @returns The read value.
+ */
 function readRecordColumnValue(
     databaseType: DatabaseType,
     currentRecordView: DataView<ArrayBufferLike>,
@@ -279,6 +333,12 @@ function readRecordColumnValue(
     }
 }
 
+/**
+ * Reads a record as an array of values. Used for index records.
+ * 
+ * @param cell The index cell containing the record.
+ * @returns An array of values.
+ */
 function readRecordAsArray(cell: IndexInteriorCell | IndexLeafCell): DataValueType[] {
     const record: DataValueType[] = [];
 
@@ -292,6 +352,12 @@ function readRecordAsArray(cell: IndexInteriorCell | IndexLeafCell): DataValueTy
     return record;
 }
 
+/**
+ * Reads a cell from a table leaf page.
+ * 
+ * @param cellView The DataView pointing to the cell.
+ * @returns The parsed TableLeafCell.
+ */
 function readTableLeafCell(cellView: DataView): TableLeafCell {
     const recordSizeVarint = readVarint(cellView);
 
@@ -327,6 +393,12 @@ interface IndexLeafCell {
     keyRecordBodyView: DataView;
 }
 
+/**
+ * Reads a cell from an index leaf page.
+ * 
+ * @param cellView The DataView pointing to the cell.
+ * @returns The parsed IndexLeafCell.
+ */
 function readIndexLeafCell(cellView: DataView): IndexLeafCell {
     const recordSizeVarint = readVarint(cellView);
 
@@ -357,6 +429,12 @@ interface TableInteriorCell {
     key: number;
 }
 
+/**
+ * Reads a cell from a table interior page.
+ * 
+ * @param cellView The DataView pointing to the cell.
+ * @returns The parsed TableInteriorCell.
+ */
 function readTableInteriorCell(cellView: DataView): TableInteriorCell {
     const cell: TableInteriorCell = {
         leftChildPointer: cellView.getUint32(0),
@@ -371,6 +449,12 @@ interface IndexInteriorCell {
     keyRecordBodyView: DataView;
 }
 
+/**
+ * Reads a cell from an index interior page.
+ * 
+ * @param cellView The DataView pointing to the cell.
+ * @returns The parsed IndexInteriorCell.
+ */
 function readIndexInteriorCell(cellView: DataView): IndexInteriorCell {
     const leftChildPointer = cellView.getUint32(0);
 
@@ -399,12 +483,29 @@ function readIndexInteriorCell(cellView: DataView): IndexInteriorCell {
     };
 }
 
+/**
+ * Parses the SQL CREATE TABLE statement to get the table schema.
+ * 
+ * @param table The table object.
+ * @returns The table schema.
+ */
 export function getTableSchema(table: Table): TableSchema {
     const tokens = scanSql(table.sql);
     const createTableNode = parseSql(tokens) as CreateTableNode;
     return createTableNode.tableSchema;
 }
 
+/**
+ * Retrieves all rows from a table, optionally filtering them.
+ * This function performs a full table scan.
+ * 
+ * @param database The Database object.
+ * @param table The table to retrieve rows from.
+ * @param tableSchema The schema of the table.
+ * @param columnsToRetrieve The set of column names to retrieve.
+ * @param filter An optional filter function.
+ * @returns A Promise that resolves to an array of rows.
+ */
 export async function getAllTableRows(
     database: Database,
     table: Table,
@@ -438,6 +539,15 @@ export async function getAllTableRows(
     return rows;
 }
 
+/**
+ * Retrieves row IDs from an index that match a given value.
+ * This function traverses the B-tree index.
+ * 
+ * @param database The Database object.
+ * @param index The index to search.
+ * @param indexValue The value to search for.
+ * @returns A Promise that resolves to an array of row IDs.
+ */
 export async function getRowIdsWithIndexValue(
     database: Database,
     index: Index,
@@ -517,6 +627,17 @@ function createPagesCache(database: Database) {
     }
 }
 
+/**
+ * Retrieves rows from a table by their row IDs.
+ * This function uses the B-tree structure to efficiently find rows.
+ * 
+ * @param database The Database object.
+ * @param table The table to retrieve rows from.
+ * @param tableSchema The schema of the table.
+ * @param columnsToRetrieve The set of column names to retrieve.
+ * @param rowIds The list of row IDs to retrieve.
+ * @returns A Promise that resolves to an array of rows.
+ */
 export async function getRowsByRowIds(
     database: Database,
     table: Table,
@@ -559,6 +680,14 @@ export async function getRowsByRowIds(
     return Promise.all(searchPromises);
 }
 
+/**
+ * Retrieves all rows from a table leaf page.
+ * 
+ * @param page The table leaf page.
+ * @param tableSchema The schema of the table.
+ * @param columnsToRetrieve The set of column names to retrieve.
+ * @returns An array of rows.
+ */
 export function getAllTableLeafPageRows(
     page: DatabasePage,
     tableSchema: TableSchema,
@@ -586,6 +715,14 @@ export function getAllTableLeafPageRows(
     return schemaTableRows;
 }
 
+/**
+ * Finds the child page pointer in an interior table page that contains the given row ID.
+ * This uses binary search on the cell keys.
+ * 
+ * @param page The interior table page.
+ * @param rowId The row ID to search for.
+ * @returns The page number of the child page.
+ */
 export function getChildTablePageContainingRowId(
     page: DatabasePage,
     rowId: number,
@@ -640,6 +777,14 @@ export function getChildTablePageContainingRowId(
     return foundCell.leftChildPointer;
 }
 
+/**
+ * Finds the cell in a table leaf page that corresponds to the given row ID.
+ * This uses binary search on the cell row IDs.
+ * 
+ * @param page The table leaf page.
+ * @param rowId The row ID to search for.
+ * @returns The TableLeafCell if found, or null.
+ */
 export function getCellWithRowIdFromTableLeafPage(
     page: DatabasePage,
     rowId: number,
@@ -681,6 +826,12 @@ export function getCellWithRowIdFromTableLeafPage(
     return null;
 }
 
+/**
+ * Retrieves all cells from a table interior page.
+ * 
+ * @param page The table interior page.
+ * @returns An array of TableInteriorCell.
+ */
 export function getAllTableInteriorPageCells(
     page: DatabasePage,
 ): TableInteriorCell[] {
@@ -697,6 +848,12 @@ export function getAllTableInteriorPageCells(
     return cells;
 }
 
+/**
+ * Retrieves all cells from an index interior page.
+ * 
+ * @param page The index interior page.
+ * @returns An array of IndexInteriorCell.
+ */
 export function getAllIndexInteriorPageCells(
     page: DatabasePage,
 ): IndexInteriorCell[] {
@@ -713,6 +870,12 @@ export function getAllIndexInteriorPageCells(
     return cells;
 }
 
+/**
+ * Retrieves all cells from an index leaf page.
+ * 
+ * @param page The index leaf page.
+ * @returns An array of IndexLeafCell.
+ */
 export function getAllIndexLeafPageCells(
     page: DatabasePage,
 ): IndexLeafCell[] {

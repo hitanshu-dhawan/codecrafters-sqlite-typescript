@@ -1,3 +1,6 @@
+/**
+ * Enum representing the different types of tokens that can be identified in a SQL query.
+ */
 export enum TokenType {
     Create = 'create',
     Table = 'table',
@@ -19,6 +22,9 @@ export enum TokenType {
     Eof = 'eof',
 }
 
+/**
+ * Represents a token found in the SQL query.
+ */
 export class Token {
     constructor(
         public readonly type: TokenType,
@@ -38,6 +44,13 @@ const keywordsMap: Record<string, TokenType> = {
     key: TokenType.Key,
 }
 
+/**
+ * Scans a SQL source string and converts it into a list of tokens.
+ * This is the lexical analysis phase of parsing.
+ * 
+ * @param source The SQL query string.
+ * @returns An array of tokens.
+ */
 export function scanSql(source: string): Token[] {
     const tokens: Token[] = [];
 

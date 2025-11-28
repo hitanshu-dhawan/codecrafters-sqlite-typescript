@@ -3,6 +3,13 @@ import type { Row } from "./database-types";
 import { CreateIndexNode, NodeType, parseSql, SelectNode } from "./sql-parser";
 import { scanSql } from "./sql-scanner";
 
+/**
+ * Executes a SQL command on the given database.
+ * 
+ * @param database The Database object.
+ * @param command The SQL command string.
+ * @returns A Promise that resolves when execution is complete.
+ */
 export async function executeSql(database: Database, command: string): Promise<void> {
     const tokens = scanSql(command);
     const sqlCommand = parseSql(tokens);
@@ -13,6 +20,11 @@ export async function executeSql(database: Database, command: string): Promise<v
         throw new Error(`Unknown command ${command}`);
     }
 
+    /**
+     * Executes a SELECT statement.
+     * 
+     * @param selectNode The parsed SELECT statement node.
+     */
     async function executeSelect(selectNode: SelectNode) {
         const { tables, indexes } = await getTablesAndIndexes(database);
         const table = tables.find(table => table.name === selectNode.table);
@@ -72,6 +84,14 @@ export async function executeSql(database: Database, command: string): Promise<v
         );
     }
 
+    /**
+     * Finds an index for a specific table and column.
+     * 
+     * @param indexes The list of all indexes.
+     * @param table The table to find the index for.
+     * @param column The column name.
+     * @returns The matching Index object, or undefined if not found.
+     */
     function findIndexForTableAndColumn(indexes: Index[], table: Table, column: string): Index | undefined {
         const indexesForTable = indexes.filter(index => index.tableName === table.name);
 

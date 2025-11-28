@@ -1,12 +1,19 @@
 import type { ColumnDefinition, DataValueType, TableSchema } from "./database-types";
 import { Token, TokenType } from "./sql-scanner";
 
+/**
+ * Enum representing the different types of AST nodes.
+ */
 export enum NodeType {
     Select = 'select',
     CreateTable = 'create_table',
     CreateIndex = 'create_index',
 }
 
+/**
+ * Represents a WHERE clause expression.
+ * Currently only supports simple equality checks (column = value).
+ */
 export class WhereExpressionNode {
     constructor(
         public readonly columnName: string,
@@ -14,6 +21,9 @@ export class WhereExpressionNode {
     ) { }
 }
 
+/**
+ * Represents a SELECT statement.
+ */
 export class SelectNode {
     public readonly type = NodeType.Select;
 
@@ -24,6 +34,9 @@ export class SelectNode {
     ) { }
 }
 
+/**
+ * Represents a CREATE TABLE statement.
+ */
 export class CreateTableNode {
     public readonly type = NodeType.CreateTable;
 
@@ -33,6 +46,9 @@ export class CreateTableNode {
     ) { }
 }
 
+/**
+ * Represents a CREATE INDEX statement.
+ */
 export class CreateIndexNode {
     public readonly type = NodeType.CreateIndex;
 
@@ -45,6 +61,13 @@ export class CreateIndexNode {
 
 export type SqlNode = SelectNode | CreateTableNode | CreateIndexNode;
 
+/**
+ * Parses a list of tokens into an Abstract Syntax Tree (AST).
+ * This is the syntactic analysis phase of parsing.
+ * 
+ * @param tokens The list of tokens from the scanner.
+ * @returns The root node of the AST.
+ */
 export function parseSql(tokens: Token[]): SqlNode {
     let current = 0;
 

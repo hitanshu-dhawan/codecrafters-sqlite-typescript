@@ -5,6 +5,7 @@ const args = process.argv;
 const databaseFilePath: string = args[2]
 const command: string = args[3];
 
+// Handle the .dbinfo command to print database metadata
 if (command === ".dbinfo") {
     const database = await openDatabase(databaseFilePath);
 
@@ -12,7 +13,9 @@ if (command === ".dbinfo") {
     console.log(`number of tables: ${database.tablesCount}`);
 
     await closeDatabase(database);
-} else if (command === ".tables") {
+}
+// Handle the .tables command to list all tables in the database
+else if (command === ".tables") {
     const database = await openDatabase(databaseFilePath);
 
     const { tables } = await getTablesAndIndexes(database);
@@ -21,7 +24,9 @@ if (command === ".dbinfo") {
     console.log(tablesNames.join(' '));
 
     await closeDatabase(database);
-} else {
+}
+// Handle SQL queries
+else {
     const database = await openDatabase(databaseFilePath);
 
     try {

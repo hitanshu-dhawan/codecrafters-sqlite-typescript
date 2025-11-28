@@ -1,33 +1,34 @@
-import { open } from 'fs/promises';
-import { constants } from 'fs';
+import { closeDatabase, getTablesAndIndexes, openDatabase } from './database';
+import { executeSql } from './sql-executor';
 
 const args = process.argv;
-const databaseFilePath: string = args[2];
+const databaseFilePath: string = args[2]
 const command: string = args[3];
 
 if (command === ".dbinfo") {
-    // Open the database file in read-only mode
-    const databaseFileHandler = await open(databaseFilePath, constants.O_RDONLY);
+    const database = await openDatabase(databaseFilePath);
 
-    // Read the first 100 bytes of the file (the database header)
-    // See: https://www.sqlite.org/fileformat.html#the_database_header
-    const databaseHeaderBuffer: Uint8Array = new Uint8Array(100);
-    await databaseFileHandler.read(databaseHeaderBuffer, 0, databaseHeaderBuffer.length, 0);
+    console.log(`database page size: ${database.pageSize}`);
+    console.log(`number of tables: ${database.tablesCount}`);
 
-    // The page size is a 2-byte integer at offset 16 in the header
-    const pageSize = new DataView(databaseHeaderBuffer.buffer, 0, databaseHeaderBuffer.byteLength).getUint16(16);
-    console.log(`database page size: ${pageSize}`);
+    await closeDatabase(database);
+} else if (command === ".tables") {
+    const database = await openDatabase(databaseFilePath);
 
-    // Read b-tree page header (after the 100-byte file header)
-    // See: https://www.sqlite.org/fileformat.html#b_tree_pages
-    const bTreePageHeaderBuffer: Uint8Array = new Uint8Array(8);
-    await databaseFileHandler.read(bTreePageHeaderBuffer, 0, bTreePageHeaderBuffer.length, 100);
+    const { tables } = await getTablesAndIndexes(database);
+    const tablesNames = tables.map(table => table.name);
 
-    // The number of cells is a 2-byte big-endian integer at offset 3 in the b-tree page header
-    const numberOfTables = new DataView(bTreePageHeaderBuffer.buffer, 0, bTreePageHeaderBuffer.byteLength).getUint16(3);
-    console.log(`number of tables: ${numberOfTables}`);
+    console.log(tablesNames.join(' '));
 
-    await databaseFileHandler.close();
+    await closeDatabase(database);
 } else {
-    throw new Error(`Unknown command ${command}`);
+    const database = await openDatabase(databaseFilePath);
+
+    try {
+        await executeSql(database, command);
+    } catch (error: any) {
+        console.error(error?.message || 'Unknown error');
+    }
+
+    await closeDatabase(database);
 }
